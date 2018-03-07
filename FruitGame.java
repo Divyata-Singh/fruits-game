@@ -10,21 +10,26 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.lang.management.*;
 
 public class FruitGame {
 	private static final String INPUTFILENAME = "input.txt";
 	private static final String OUTPUTFILENAME = "output.txt";
 	private static final String CALIBRATE = "calibration.txt";
 	private static int n;
+	private static int count = 0;
 	private static double perNodeTime;
+	private static List<Integer> bf;
 
 	public static void main(String[] args) {
+		double startUserTime = getUserTime();
 		try (BufferedReader br = new BufferedReader(new FileReader(CALIBRATE))) {
 			perNodeTime = Double.parseDouble(br.readLine());
 		} catch (IOException e) {
 			perNodeTime = 8.846533871751641E-6;
 		}
 		try (BufferedReader br = new BufferedReader(new FileReader(INPUTFILENAME))) {
+			bf = new ArrayList<Integer>();
 			n = Integer.parseInt(br.readLine());
 			int p = Integer.parseInt(br.readLine());
 			double timeLeft = Double.parseDouble(br.readLine());
@@ -37,9 +42,30 @@ public class FruitGame {
 				k++;
 			}
 			state initState = new state(inGrid, new position(-1, -1), 0, 0, true);
-			int maxDepth = (int) Math.ceil(Math.log(maxNodes) / (2 * Math.log(p)));
+			int maxDepth;
+			if (timeLeft <= 30) {
+				maxDepth = 1;
+			} else {
+				maxDepth = (int) Math.ceil(Math.log(maxNodes) / (2 * Math.log(p)));
+				if (maxDepth > 4 && n >= 1) {
+					if (p > 2)
+						maxDepth = 4;
+					else
+						maxDepth = 5;
+				}
+			}
 			state r = minimax(0, initState, maxDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
 			writeOutput(r);
+			System.out.println("MaxNodes that can be expanded:" + maxNodes);
+			System.out.println("MaxDepth:" + maxDepth);
+			long sum = 0;
+			for (int i : bf) {
+				sum += i;
+			}
+			System.out.println("total Nodes in tree:" + sum);
+			System.out.println("Nodes Expanded:" + count);
+			System.out.println("Time given:" + timeLeft);
+			System.out.println("Time taken:" + (getUserTime() - startUserTime) / Math.pow(10, 9));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -50,6 +76,7 @@ public class FruitGame {
 		TreeMap<Integer, List<Integer>> moveTree;
 		moveTree = new TreeMap<Integer, List<Integer>>(Collections.reverseOrder());
 		findAllMoves(s.board, conComp, moveTree);
+		bf.add(conComp.size());
 		state result = null;
 		if (conComp.isEmpty() || depth == maxDepth) {
 			result = new state(s);
@@ -61,6 +88,7 @@ public class FruitGame {
 				List<Integer> moves = moveTree.get(i.next());
 				for (int move : moves) {
 					state newState = applyMove(s, conComp.get(move));
+					count++;
 					if (s.myTurn) {
 						state resState = minimax(depth + 1, newState, maxDepth, alpha, beta);
 						if (s.score < resState.score) {
@@ -90,6 +118,13 @@ public class FruitGame {
 			}
 			return result;
 		}
+	}
+
+	private static void printboard(char[][] board) {
+		for (int i = 0; i < n; i++) {
+			System.out.println(board[i]);
+	 	}
+	 	System.out.println();
 	}
 
 	private static state applyMove(state s, List<position> move) {
@@ -192,7 +227,11 @@ public class FruitGame {
 			}
 		}
 	}
-	
+
+	private static double getUserTime() {
+		ThreadMXBean b = ManagementFactory.getThreadMXBean();
+		return b.isThreadCpuTimeSupported() ? b.getCurrentThreadUserTime() : 0L;
+	}
 }
 
 class state {
